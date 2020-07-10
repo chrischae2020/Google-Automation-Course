@@ -1,0 +1,217 @@
+#!/usr/bin/env python3
+#working with supplier images
+#WORKING
+
+import os, glob
+from PIL import Image
+
+newsize = 600, 400
+
+for file in glob.glob("/home/student-01-6e7cac144d56/supplier-data/images/*.tiff"):
+    im = Image.open(file)
+    new_img = im.resize(newsize).convert('RGB')
+    newName = file.replace(".tiff",".jpeg")
+    new_img.save(newName)
+
+
+
+#!/usr/bin/env python3
+# uploading images to web server
+#WORKING
+
+import requests
+import os
+
+url = "http://35.188.13.240/upload/" 
+imdir = "/home/student-01-6e7cac144d56/supplier-data/images/"
+list_image = os.listdir(imdir)
+jpeg_im = [imname for imname in list_image if '.jpeg' in imname]
+
+for i in jpeg_im:
+    with open(imdir + i, 'rb') as opened:
+        r = requests.post(url, files={'file': opened})
+        
+        
+        
+#! /usr/bin/env python3
+#uploading the descriptions
+#WORKING
+
+import os
+import requests
+import json
+
+imdir = "/home/student-01-6e7cac144d56/supplier-data/images/"
+list_image = os.listdir(imdir)
+jpeg_im = [imname for imname in list_image if '.jpeg' in imname]
+url = 'http://35.188.13.240/fruits/'
+bigd =[]
+
+for file in os.listdir("/home/student-01-6e7cac144d56/supplier-data/descriptions"):
+    with open("/home/student-01-6e7cac144d56/supplier-data/descriptions/"+ file, 'r') as f:
+        d = {}
+        title = ["name", "weight", "description", "image_name"]
+        counter = 0
+        for line in f:
+            d[title[counter]] = line.rstrip("\n")
+            counter+=1
+        d["weight"] = int(d["weight"].replace(" lbs", ''))
+
+        for image in jpeg_im:
+            if file[0:3] == image[0:3]:
+                d["image_name"] = image
+        bigd.append(d)
+        print(d)
+
+for item in bigd:
+    r = requests.post(url, json=item)
+
+
+
+#!/usr/bin/env python3
+#reports.py
+
+from reportlab.platypus import SimpleDocTemplate
+from reportlab.platypus import Paragraph, Spacer, Table, Image
+from reportlab.lib.styles import getSampleStyleSheet
+
+def generate_report(file, title, description):
+    styles = getSampleStyleSheet()
+    report = SimpleDocTemplateple(file)
+    report_title = Paragraph(title, styles["h1"])
+    report_body = Paragraph(description, styles["BodyText"])
+    empty_line = Spacer(1,20)
+    report.build([report_title, report_body])
+    
+    
+    
+#!/usr/bin/env python3
+#report_email.py
+
+import reports
+import emails
+import os 
+from datetime import date
+
+
+path = '/home/student-01-6e7cac144d56/supplier-data/descriptions/'
+list_text_files = os.listdir(path)
+
+report = []
+
+def process_data(data):
+    for item in data:
+        with open("supplier-data/" + item, 'r') as f:
+            first = f.readline()
+            second = f.readlines()[0]
+            report.append("name: {}<br/>weight: {}\n".format(first, second))
+    return report
+
+text_data = []
+for text_file in list_text_files:
+    with open(path + text_file, 'r') as f:
+        text_data.append([line.strip() for line in f.readlines()])
+    f.close()
+
+if __name__ == "__main__":
+
+    summary = process_data(text_data)
+
+    paragraph = "<br/><br/>".join(summary)
+
+    title = "Processed Update on {}\n".format(date.today().strftime("%B %d, %Y"))
+    attachment = "/tmp/processed.pdf"
+
+    reports.generate_report(attachment, title, paragraph)
+
+    subject = "Upload Completed - Online Fruit Store"
+    sender = "automation@example.com"
+    receiver = "{}@example.com".format(os.environ.get('USER'))
+    body = "All fruits are uploaded to our website successfully."
+    message = emails.generate_email(sender, receiver, subject, body, attachment)
+    emails.send_email(message)
+    
+    
+    
+#!/usr/bin/env python3
+#emails.py
+
+import email.message
+import mimetypes
+import os.path
+import smtplib
+ 
+def generate_email(sender, recipient, subject, body, attachment_path):
+    message = email.message.EmailMessage()
+    message["From"] = sender
+    message["To"] = recipient
+    message["Subject"] = subject
+    message.set_content(body)
+ 
+    attachment_filename = os.path.basename(attachment_path)
+    mime_type, _ = mimetypes.guess_type(attachment_path)
+    mime_type, mime_subtype = mime_type.split('/', 1)
+ 
+    with open(attachment_path, 'rb') as ap:
+        message.add_attachment(ap.read(), maintype=mime_type, subtype=mime_subtype, filename=attachment_filename)
+ 
+    return message
+ 
+def send_email(message):
+    mail_server = smtplib.SMTP('localhost')
+    mail_server.send_message(message)
+    mail_server.quit()
+ 
+def generate_error_report(sender, recipient, subject, body):
+ 
+    message = email.message.EmailMessage()
+    message["From"] = sender
+    message["To"] = recipient
+    message["Subject"] = subject
+    message.set_content(body)
+ 
+    return message
+    
+    
+    
+#!/usr/bin/env python3
+# Health check
+
+import os
+import shutil
+import psutil
+import socket
+from emails import generate_error_report, send_email
+
+def check_cpu():
+    percent = psutil.cpu_percent()
+    return percent > 80
+
+def check_disk(dis):
+    disk = shutil.disk_usage(dis)
+    return (disk.free / disk.total) < 0.2
+def check_memory():
+    memory = psutil.virtual_memory().available
+    return (memory * 10^(-6)) < 500
+
+def check_localhost():
+    localhost = socket.gethostbyname('localhost')
+    return localhost == '127.0.0.1'
+
+if check_cpu() == True:
+    err = "CPU usage over 80%"
+elif check_disk('/') == True:
+    err = "Available disk space is less than 20%"
+elif check_memory() == True:
+    err = "Available memory is less than 500MB"
+elif check_localhost() == True:
+    err = "Localhost cannot be resolved to 127.0.0.1"
+    
+    
+if __name__ == "__main__":
+    sender = "automation@example.com"
+    receiver = "{}@example.com".format(os.environ.get('USER'))
+    body = "Please check your system and resolve the issue as soon as possible"
+    subject = "error {}".format(err)
+    message = generate_error_report(sender, receiver, subject, body)
+    send_email(message)
