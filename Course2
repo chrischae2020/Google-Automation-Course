@@ -1,0 +1,64 @@
+import sys
+import re
+from collections import defaultdict
+import operator
+import csv
+
+
+per_user_list = []
+per_user_dict = defaultdict(list)
+
+error_count = defaultdict(str)
+user_count = {}
+
+with open('syslog.txt', 'r') as f:
+    for line in f:
+        no_user_line = re.sub(r'\([^)]*\)', '', line)
+        result = re.search(r" ticky: ERROR (.+)", no_user_line)
+        if result is not None:
+            m = result.group(1).rstrip()
+            if m in error_count:
+                error_count[m] += 1
+            else:
+                error_count[m] = 1
+                
+        name = (re.search(r'\((.*?)\)', line).group(1))
+        oc = (re.compile("ticky: (\S+)").search(line).group(1))
+        
+        #per_user_list.append([name,oc])
+        
+        per_user_dict[name].append(oc)
+
+        per_user = defaultdict(list)
+
+userlist = []
+for value in per_user_dict:
+    value_list = per_user_dict[value]
+    
+    info = 0
+    error = 0
+
+    for j in range(len(value_list)):        
+        if value_list[j] == 'INFO':
+            info += 1
+        else:
+            error += 1
+    
+    per_user[value].append([info, error])
+    user = {k:v[0] for k,v in per_user.items()}
+
+with open('error_message.csv', 'w') as cf:
+    cw = csv.writer(cf)
+    cw.writerow(['Error', 'Count'])
+    for error in sorted(error_count.items(), key = operator.itemgetter(1), reverse=True):
+        cw.writerow(error)
+
+with open('user_statistics.csv', 'w') as cf2:
+    cw2 = csv.writer(cf2)
+    cw2.writerow(['Username', 'INFO', 'ERROR'])
+    for key, value in sorted(user.items(), key = operator.itemgetter(0)):
+        [cf2.write('{0},{1}\n'.format(key, value))]
+# with open('user_statistics.csv', 'w') as f:
+#     cw2 = csv.writer(f)
+#     cw2.writerow(['Username', 'INFO', 'ERROR'])
+#     [f.write('{0},{1}\n'.format(key, value)) for key, value in sorted(user.items(), key=operator.itemgetter(0))]
